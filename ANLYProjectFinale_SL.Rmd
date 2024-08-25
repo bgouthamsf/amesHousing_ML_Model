@@ -1,0 +1,517 @@
+---
+title: "ANLYProjectNew"
+author: "Goutham Bommu"
+date: "`r Sys.Date()`"
+output: word_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+rm(list=ls())
+library(ggplot2)
+library(tidyverse)
+library(readr)
+library(corrplot)
+library(car)
+library(MASS)
+
+data <- read_tsv("/Users/gouthambommu/Downloads/ANLYProject/AmesHousing.tsv")
+
+head(data)
+names(data)
+```
+
+```{r}
+# Check for missing values in the entire dataset
+missing_values <- sapply(data, function(x) sum(is.na(x)))
+missing_values <- sort(missing_values, decreasing = TRUE)
+missing_values[missing_values > 0]
+
+```
+
+```{r}
+#   I see that we have a lot of missing values in the data and the number of each field having blank values is mentioned in the above ouput.
+```
+
+```{r}
+selected_vars <- c("SalePrice", "Year Built", "Bldg Type", "House Style", "Gr Liv Area", "Overall Cond", "Neighborhood")
+
+# Subset the data to include only selected variables
+subset_data <- data[, selected_vars]
+
+# Check for missing values in the selected variables
+missing_in_subset <- sapply(subset_data, function(x) sum(is.na(x)))
+missing_in_subset
+
+```
+
+```{r}
+#   It shows that we don't have any blank values in the columns we selected to continue the analysis.
+```
+
+```{r}
+# Remove rows with missing data in the selected variables
+df <- subset_data %>%
+  na.omit()
+
+# Display the first few rows of the cleaned data
+head(df)
+summary(df)
+```
+
+```{r}
+#   Interpretation of Summary Statistics
+
+#   SalePrice ranges from $12,789 to $755,000, with a median of $160,000 and a mean of $180,796, indicating a right-skewed distribution.
+
+#   Year Built ranges from 1872 to 2010, with a median of 1973, suggesting that the dataset includes houses from a wide range of periods, but the majority were built in the mid-to-late 20th century.
+
+#   Gr Liv Area (Total Living Area) ranges from 334 to 5642 square feet, with a median of 1442 square feet and a mean of 1500 square feet, indicating a slight skew towards larger homes.
+```
+
+```{r}
+# Histogram of SalePrice
+ggplot(df, aes(x = SalePrice)) +
+  geom_histogram(binwidth = 10000, fill = "blue", color = "black") +
+  labs(title = "Distribution of SalePrice", x = "SalePrice", y = "Count")
+
+```
+
+```{r}
+#   The histogram of SalePrice shows a right-skewed distribution with most house prices concentrated between $100,000 and $300,000. There are fewer houses with very high prices, which extend up to around $600,000 and beyond.
+```
+
+```{r}
+# Scatter plot of Year Built vs. SalePrice
+ggplot(df, aes(x = `Year Built`, y = SalePrice)) +
+  geom_point() +
+  geom_smooth(method = "lm", col = "red") +
+  labs(title = "SalePrice vs. Year Built", x = "Year Built", y = "SalePrice")
+
+```
+
+```{r}
+#   The scatter plot of SalePrice versus Year Built shows a positive relationship, indicating that newer houses tend to have higher sale prices. The trend line (in red) reinforces this positive correlation.
+```
+
+```{r}
+# Scatter plot of Gr Liv Area vs. SalePrice
+ggplot(df, aes(x = `Gr Liv Area`, y = SalePrice)) +
+  geom_point() +
+  geom_smooth(method = "lm", col = "red") +
+  labs(title = "SalePrice vs. Gr Liv Area", x = "Gr Liv Area", y = "SalePrice")
+
+```
+
+```{r}
+#   The scatter plot of SalePrice versus Gr Liv Area (Total Living Area) shows a strong positive relationship. As the living area increases, the sale price also tends to increase. The trend line (in red) highlights this positive correlation, indicating that larger homes generally have higher sale prices.
+```
+
+```{r}
+# Boxplot of SalePrice by Overall Cond
+ggplot(df, aes(x = factor(`Overall Cond`), y = SalePrice)) +
+  geom_boxplot() +
+  labs(title = "SalePrice by Overall Cond", x = "Overall Cond", y = "SalePrice")
+
+```
+
+```{r}
+#   The boxplot of SalePrice by Overall Cond indicates that houses with better overall conditions generally have higher sale prices. As the overall condition rating increases from 1 to 9, there is a noticeable increase in the median sale price, although there is some variability within each condition category.
+```
+
+```{r}
+# Bar plot of Overall Cond
+ggplot(df, aes(x = factor(`Overall Cond`))) +
+  geom_bar(fill = "blue", color = "black") +
+  labs(title = "Distribution of Overall Condition of Houses", x = "Overall Cond", y = "Count")
+
+```
+
+```{r}
+#   Most of the housesin the Market are in condition 5.
+```
+
+```{r}
+# Boxplot of SalePrice by Bldg Type
+ggplot(df, aes(x = `Bldg Type`, y = SalePrice)) +
+  geom_boxplot() +
+  labs(title = "SalePrice by Bldg Type", x = "Bldg Type", y = "SalePrice")
+
+```
+
+```{r}
+#   The boxplot of SalePrice by Bldg Type shows that single-family homes (1Fam) tend to have the highest sale prices, with a larger spread and more outliers compared to other building types. Two-family conversions (2fmCon), duplexes (Duplex), and townhouses (Twnhs and TwnhsE) generally have lower sale prices with less variability.
+```
+
+```{r}
+# Boxplot of SalePrice by House Style
+ggplot(df, aes(x = `House Style`, y = SalePrice)) +
+  geom_boxplot() +
+  labs(title = "SalePrice by House Style", x = "House Style", y = "SalePrice")
+
+```
+
+```{r}
+#   The boxplot of SalePrice by House Style indicates that different house styles have varying impacts on sale prices. One-story houses (1Story) and two-story houses (2Story) tend to have higher median sale prices compared to other styles. There is also a considerable spread and a number of outliers in these categories, suggesting a wide range of prices within these house styles.
+```
+
+```{r}
+# Dot chart of SalePrice by Neighborhood
+ggplot(df, aes(x = SalePrice, y = reorder(Neighborhood, SalePrice, FUN = median))) +
+  geom_point() +
+  labs(title = "SalePrice by Neighborhood", x = "SalePrice", y = "Neighborhood") +
+  theme(axis.text.y = element_text(angle = 0, hjust = 1))
+```
+
+```{r}
+#   The dot chart of SalePrice by Neighborhood shows the distribution of sale prices across different neighborhoods. Neighborhoods such as StoneBr, NridgHt, and NoRidge have higher median sale prices, making them some of the costliest neighborhoods to buy a house in.
+```
+
+```{r}
+## Correlation Matrix for Numerical Variables
+
+# Load necessary library
+library(corrplot)
+
+# Select numerical variables
+num_vars <- data %>% select_if(is.numeric)
+
+# Compute the correlation matrix
+cor_matrix <- cor(num_vars, use = "complete.obs")
+
+# Visualize the correlation matrix with improved label readability
+corrplot::corrplot(cor_matrix, method = "circle", tl.cex = 0.6, tl.col = "black", tl.srt = 45)
+
+
+```
+
+```{r}
+# Load necessary libraries
+library(corrplot)
+library(dplyr)
+
+# Assuming the full dataset is named 'data'
+# Select numerical variables
+num_vars <- data %>% select_if(is.numeric)
+
+# Compute the correlation matrix
+cor_matrix <- cor(num_vars, use = "complete.obs")
+
+# Extract correlations with SalePrice
+cor_saleprice <- cor_matrix[,"SalePrice"]
+
+# Sort the correlations in descending order (absolute values)
+sorted_cor <- sort(abs(cor_saleprice), decreasing = TRUE)
+
+# Display the sorted correlations
+sorted_cor
+
+
+
+```
+
+```{r}
+#####   INFERENCE ANALYSIS
+```
+
+```{r}
+# Multiple linear regression model with top 7 indicators
+model <- lm(SalePrice ~ `Bldg Type` +`House Style` +`Overall Cond` +`Year Built` +`Overall Qual` + `Gr Liv Area` + `Garage Cars` + `Garage Area` + `Total Bsmt SF` + `1st Flr SF` + `Full Bath`, data = data)
+
+# Summary of the model
+summary(model)
+
+
+```
+
+```{r}
+#   The multiple linear regression analysis provides the coefficients for each predictor and their respective p-values. Significant predictors will have p-values less than 0.05 and confidence intervals that do not include zero.
+
+
+#   SIGNIFICANT PREDICTORS:
+
+#   Year Built: The positive coefficient indicates that newer houses tend to have higher sale prices.
+
+#   Bldg Type: All building types except the baseline (single-family homes) have negative coefficients, indicating lower sale prices compared to single-family homes, except for TwnhsE which is not significant.
+
+#   House Style: Some house styles, such as 1.5Unf, 1Story, and SFoyer, have significant positive coefficients, indicating higher sale prices compared to the baseline house style. Other styles, such as 2.5Fin and 2Story, have significant negative coefficients.
+
+#   Gr Liv Area: The positive coefficient indicates that larger living areas are associated with higher sale prices.
+
+#   Overall Cond: The positive coefficient indicates that better overall condition ratings are associated with higher sale prices.
+```
+
+```{r}
+# Confidence intervals for the coefficients
+confint(model)
+
+```
+
+```{r}
+#   The multiple linear regression analysis without the Neighborhood variable provides the coefficients for each predictor and their respective confidence intervals. Significant predictors will have confidence intervals that do not include zero.
+
+
+#   SIGNIFICANT PREDICTORS:
+
+#   Year Built: The positive coefficient indicates that newer houses tend to have higher sale prices. The confidence interval (1040.0041, 1173.0430) does not include zero, indicating significance.
+
+#   Bldg Type:
+
+#   2fmCon: The negative coefficient (-22214.5385, -781.1022) indicates lower sale prices compared to single-family homes.
+
+#   Duplex: The negative coefficient (-66699.9706, -50221.2690) indicates significantly lower sale prices.
+
+#   Twnhs: The negative coefficient (-28030.8471, -10761.2925) indicates significantly lower sale prices.
+
+#   TwnhsE: The confidence interval (-8519.8045, 3208.8210) includes zero, indicating it is not significant.
+
+#   House Style:
+
+#   1.5Unf: The positive coefficient (20449.6722, 59147.4940) indicates higher sale prices.
+
+#   1Story: The positive coefficient (19578.2165, 31089.9487) indicates higher sale prices.
+
+#   2.5Fin: The negative coefficient (-84030.5027, -24580.5210) indicates significantly lower sale prices.
+
+#   2.5Unf: The confidence interval (-14889.2690, 19986.6790) includes zero, indicating it is not significant.
+
+#   2Story: The negative coefficient (-19256.6321, -7322.5340) indicates lower sale prices.
+
+#   SFoyer: The positive coefficient (19478.4853, 41241.7392) indicates higher sale prices.
+
+#   SLvl: The confidence interval (-9813.0560, 8113.6384) includes zero, indicating it is not significant.
+
+#   Gr Liv Area: The positive coefficient (112.3598, 120.0918) indicates that larger living areas are associated with higher sale prices.
+
+#   Overall Cond: The positive coefficient (7884.0345, 10838.4764) indicates that better overall condition ratings are associated with higher sale prices.
+```
+
+```{r}
+# INITIATE MODEL
+# Multiple linear regression model
+initial_model <- lm(SalePrice ~ `Bldg Type` + `House Style` + `Overall Cond` + 
+    `Year Built` + `Overall Qual` + `Gr Liv Area` + `Garage Cars` + 
+    `Garage Area` + `Total Bsmt SF`, data = data)
+
+
+# Summary of the model
+summary(initial_model)
+
+```
+
+```{r}
+# Stepwise selection to find the best model
+stepwise_model <- stepAIC(initial_model, direction = "both")
+
+# Summary of the stepwise model
+summary(stepwise_model)
+
+```
+
+```{r}
+#   The final model obtained through stepwise selection includes the variables Year Built, Bldg Type, House Style, Gr Liv Area, and Overall Cond. Here are the key takeaways:
+
+#   Year Built: The positive coefficient (1107) indicates that newer houses tend to have higher sale prices.
+
+#   Bldg Type:
+#   2fmCon: The negative coefficient (-11500) indicates lower sale prices compared to single-family homes.
+#   Duplex: The negative coefficient (-58460) indicates significantly lower sale prices.
+#   Twnhs: The negative coefficient (-19400) indicates significantly lower sale prices.
+#   TwnhsE: This variable is not significant.
+
+# House Style:
+#   1.5Unf, 1Story, and SFoyer have positive coefficients, indicating higher sale prices compared to the baseline house style.
+#   2.5Fin and 2Story have negative coefficients, indicating lower sale prices.
+#   2.5Unf and SLvl are not significant.
+
+#   Gr Liv Area: The positive coefficient (116.2) indicates that larger living areas are associated with higher sale prices.
+
+#   Overall Cond: The positive coefficient (9361) indicates that better overall condition ratings are associated with higher sale prices.
+
+
+#   Model Evaluation:
+#   The final model has an Adjusted R-squared value of 0.7304, indicating that approximately 73% of the variance in house prices is explained by the model. The F-statistic is highly significant, suggesting that the model is a good fit.
+```
+
+```{r}
+#Check for Multicollinearity
+# Variance Inflation Factor (VIF)
+vif(stepwise_model)
+
+```
+
+```{r}
+#   The Generalized Variance Inflation Factor (GVIF) values indicate that there is no significant multicollinearity among the predictors, as all GVIF values are below the commonly used threshold of 10, and their respective GVIF^(1/(2*Df)) values are below 2. This suggests that the predictors in the model are not highly correlated with each other, which is a good indication for the stability of the model coefficients.
+```
+
+```{r}
+# Model Evaluation
+# Residual plots to check for homoscedasticity and normality of residuals
+par(mfrow = c(2, 2))
+plot(stepwise_model)
+
+```
+
+```{r}
+#   Interpretation of Residual Plots
+
+#   Residuals vs Fitted Values: Indicates non-linearity, as residuals are not randomly scattered.
+
+#   Q-Q Plot of Residuals: Shows deviation from normality, especially in the tails.
+
+#   Scale-Location Plot: Suggests heteroscedasticity, as residual variance increases with fitted values.
+
+#   Residuals vs Leverage: Identifies influential data points that may need further investigation.
+
+```
+
+```{r}
+#   Address Model Issues
+
+# Log transformation of SalePrice to address non-normality and heteroscedasticity
+df$LogSalePrice <- log(df$SalePrice)
+
+# Multiple linear regression model with transformed SalePrice
+log_model <- lm(SalePrice ~ `Bldg Type` + `House Style` + `Overall Cond` + 
+    `Year Built` + `Overall Qual` + `Gr Liv Area` + `Garage Cars` + 
+    `Garage Area` + `Total Bsmt SF`, data = data)
+
+# Summary of the log-transformed model
+summary(log_model)
+
+```
+
+```{r}
+# Residual plots to check for homoscedasticity and normality of residuals
+par(mfrow = c(2, 2))
+plot(log_model)
+
+```
+
+```{r}
+# Load necessary libraries
+library(dplyr)
+library(tidymodels)
+library(ggplot2)
+
+tidymodels_prefer()
+
+# Log transformation of SalePrice to address non-normality and heteroscedasticity
+data$LogSalePrice <- log(data$SalePrice)
+
+# Tidymodels setup
+set.seed(200)
+
+data <- data %>%
+  select(-LogSalePrice) %>%
+  mutate(LogSalePrice = log(SalePrice))
+
+data_split <- initial_split(data, prop = 0.8)
+data_train <- training(data_split)
+data_test <- testing(data_split)
+
+lm_model <- linear_reg() %>%
+  set_engine("lm")
+
+lm_form_fit <- lm_model %>%
+  fit(LogSalePrice ~ `Year Built` + `Bldg Type` + `House Style` + `Gr Liv Area` + `Overall Cond` + `Overall Qual` + `Garage Cars` + `Garage Area` + `Total Bsmt SF`, data = data_train)
+
+model_res <- lm_form_fit %>%
+  extract_fit_engine() %>%
+  summary()
+
+param_est <- coef(model_res)
+print(param_est)
+
+tidy(lm_form_fit)
+
+data_test_result <- data_test %>%
+  select(`Year Built`, `Bldg Type`, `House Style`, `Gr Liv Area`, `Overall Cond`, SalePrice) %>%
+  bind_cols(predict(lm_form_fit, data_test)) %>%
+  mutate(PredictedPrice = exp(.pred), Error = SalePrice - PredictedPrice)
+
+# Select specific rows for display
+selected_rows <- data_test_result %>%
+  slice(c(1, 2, 3, 4, 5, 6)) %>%
+  select(`Year Built`, `Bldg Type`, `House Style`, `Gr Liv Area`, `Overall Cond`, SalePrice, PredictedPrice, Error)
+
+selected_rows <- selected_rows %>%
+  mutate(SalePrice = scales::dollar(SalePrice),
+         PredictedPrice = scales::dollar(PredictedPrice),
+         Error = scales::dollar(Error))
+
+print(selected_rows)
+
+# Visualization
+ggplot(data_test_result, aes(x = SalePrice, y = PredictedPrice)) +
+  geom_abline(lty = 2) +
+  geom_point(alpha = 0.5) +
+  labs(y = "Predicted Sale Price", x = "Sale Price") +
+  coord_obs_pred()
+
+# Calculate and display RMSE and MAE
+rmse_result <- rmse(data_test_result, truth = SalePrice, estimate = PredictedPrice)
+mae_result <- mae(data_test_result, truth = SalePrice, estimate = PredictedPrice)
+
+data_test_metrics <- metric_set(rmse, mae)
+metrics_result <- data_test_metrics(data_test_result, truth = SalePrice, estimate = PredictedPrice)
+
+print(rmse_result)
+print(mae_result)
+print(metrics_result)
+
+
+```
+```{r}
+# Load necessary libraries
+library(dplyr)
+library(tidymodels)
+library(ggplot2)
+
+tidymodels_prefer()
+
+# Log transformation of SalePrice to address non-normality and heteroscedasticity
+data$LogSalePrice <- log(data$SalePrice)
+
+# Tidymodels setup
+set.seed(200)
+
+data_split <- initial_split(data, prop = 0.8)
+data_train <- training(data_split)
+data_test <- testing(data_split)
+
+lm_model <- linear_reg() %>%
+  set_engine("lm")
+
+lm_form_fit <- lm_model %>%
+  fit(LogSalePrice ~ `Year Built` + `Bldg Type` + `House Style` + `Gr Liv Area` + `Overall Cond` + `Overall Qual` + `Garage Cars` + `Garage Area` + `Total Bsmt SF`, data = data_train)
+
+# Making predictions
+data_test_result <- data_test %>%
+  select(`Year Built`, `Bldg Type`, `House Style`, `Gr Liv Area`, `Overall Cond`, `Overall Qual`, `Garage Cars`, `Garage Area`, `Total Bsmt SF`, LogSalePrice) %>%
+  bind_cols(predict(lm_form_fit, data_test)) %>%
+  bind_cols(predict(lm_form_fit, data_test, type = "pred_int")) %>%
+  mutate(SalePrice = exp(LogSalePrice), PredictedPrice = exp(.pred), Upper_Pred = exp(.pred_upper), Lower_Pred = exp(.pred_lower))
+
+# Viewing the results
+head(data_test_result)
+
+```
+```{r}
+ggplot(data_test_result, aes(x = SalePrice, y = PredictedPrice)) +
+  geom_abline(lty = 2) +
+  geom_point(alpha = 0.5) +
+  labs(y = "Predicted Sale Price", x = "Sale Price") +
+  coord_obs_pred()
+
+```
+```{r}
+rmse(data_test_result, truth = SalePrice, estimate = PredictedPrice)
+df_test_metrics <- metric_set(rmse, mae)
+df_test_metrics(data_test_result, truth = SalePrice, estimate = PredictedPrice)
+
+```
+
